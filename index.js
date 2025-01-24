@@ -10,7 +10,7 @@ app.use(bodyParser.json());
 
 // Conexión a MongoDB
 mongoose
-  .connect(process.env.MONGODB_URI || 'mongodb://localhost/crud-app', {
+  .connect(process.env.MONGODB_URI || 'mongodb+srv://ponchobt:diegoangel@cluster0.ssmefhs.mongodb.net/test', {
     useNewUrlParser: true,
     useUnifiedTopology: true,
     // Añadir opciones adicionales recomendadas
