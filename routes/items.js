@@ -1,10 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const Item = require('../models/item');
+const { ITEM_LIMITS } = require('../constants/item');
+const OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/;
+const DEFAULT_PAGE = 1;
+const DEFAULT_LIMIT = 10;
+const MAX_LIMIT = 100;
 
 // Middleware para validar ID
-const validarId = async (req, res, next) => {
-  if (!req.params.id.match(/^[0-9a-fA-F]{24}$/)) {
+const validarId = (req, res, next) => {
+  if (!OBJECT_ID_REGEX.test(req.params.id)) {
     return res.status(400).json({ error: 'ID inválido' });
   }
   next();
@@ -12,7 +17,8 @@ const validarId = async (req, res, next) => {
 
 // Middleware para validar datos del item
 const validarItem = (req, res, next) => {
-  const { name, description } = req.body;
+  const name = req.body.name?.trim();
+  const description = req.body.description?.trim();
 
   if (!name || !description) {
     return res.status(400).json({
@@ -24,21 +30,38 @@ const validarItem = (req, res, next) => {
     });
   }
 
-  if (name.length < 3 || name.length > 50) {
+  if (name.length < ITEM_LIMITS.name.min || name.length > ITEM_LIMITS.name.max) {
     return res.status(400).json({
-      error: 'El nombre debe tener entre 3 y 50 caracteres'
+      error: `El nombre debe tener entre ${ITEM_LIMITS.name.min} y ${ITEM_LIMITS.name.max} caracteres`
     });
   }
 
-  if (description.length < 10 || description.length > 500) {
+  if (description.length < ITEM_LIMITS.description.min || description.length > ITEM_LIMITS.description.max) {
     return res.status(400).json({
-      error: 'La descripción debe tener entre 10 y 500 caracteres'
+      error: `La descripción debe tener entre ${ITEM_LIMITS.description.min} y ${ITEM_LIMITS.description.max} caracteres`
     });
   }
 
-  req.body.name = name.trim();
-  req.body.description = description.trim();
+  req.body.name = name;
+  req.body.description = description;
   next();
+};
+
+const parsePositiveInt = (value, fallback) => {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isNaN(parsed) || parsed <= 0 ? fallback : parsed;
+};
+
+const getPagination = (query) => {
+  const page = parsePositiveInt(query.page, DEFAULT_PAGE);
+  const requestedLimit = parsePositiveInt(query.limit, DEFAULT_LIMIT);
+  const limit = Math.min(requestedLimit, MAX_LIMIT);
+  return { page, limit };
+};
+
+const handleServerError = (res, message, err) => {
+  console.error(message, err);
+  return res.status(500).json({ error: message });
 };
 
 // @route   GET api/items
@@ -46,8 +69,7 @@ const validarItem = (req, res, next) => {
 // @access  Public
 router.get('/', async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
+    const { page, limit } = getPagination(req.query);
     const items = await Item.find()
       .sort({ date: -1 })
       .skip((page - 1) * limit)
@@ -62,8 +84,7 @@ router.get('/', async (req, res) => {
       totalPages: Math.ceil(total / limit)
     });
   } catch (err) {
-    console.error('Error al obtener items:', err);
-    res.status(500).json({ error: 'Error al obtener los items' });
+    return handleServerError(res, 'Error al obtener los items', err);
   }
 });
 
@@ -85,8 +106,7 @@ router.post('/', validarItem, async (req, res) => {
       item: savedItem
     });
   } catch (err) {
-    console.error('Error al crear item:', err);
-    res.status(500).json({ error: 'Error al crear el item' });
+    return handleServerError(res, 'Error al crear el item', err);
   }
 });
 
@@ -101,8 +121,7 @@ router.get('/:id', validarId, async (req, res) => {
     }
     res.json(item);
   } catch (err) {
-    console.error('Error al obtener item:', err);
-    res.status(500).json({ error: 'Error al obtener el item' });
+    return handleServerError(res, 'Error al obtener el item', err);
   }
 });
 
@@ -126,8 +145,7 @@ router.put('/:id', [validarId, validarItem], async (req, res) => {
       item
     });
   } catch (err) {
-    console.error('Error al actualizar item:', err);
-    res.status(500).json({ error: 'Error al actualizar el item' });
+    return handleServerError(res, 'Error al actualizar el item', err);
   }
 });
 
@@ -146,8 +164,7 @@ router.delete('/:id', validarId, async (req, res) => {
       item
     });
   } catch (err) {
-    console.error('Error al eliminar item:', err);
-    res.status(500).json({ error: 'Error al eliminar el item' });
+    return handleServerError(res, 'Error al eliminar el item', err);
   }
 });
 
