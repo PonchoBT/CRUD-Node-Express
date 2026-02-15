@@ -1,6 +1,6 @@
 # CRUD Node + Express + MongoDB
 
-API REST de ejemplo para gestionar items usando Node.js, Express y MongoDB (Atlas o local), con fallback automático de conexión.
+API REST de ejemplo para gestionar items usando Node.js, Express y MongoDB.
 
 ## Requisitos
 
@@ -21,17 +21,35 @@ npm install
 
 ```env
 PORT=3000
+APP_ENV=dev
+MONGODB_URI=mongodb+srv://<usuario>:<password>@<cluster-url>/<database>?retryWrites=true&w=majority
+MONGODB_LOCAL_URI=mongodb://localhost:27017/myFirstDatabase
+```
+
+### Perfiles recomendados
+
+**Desarrollo local**
+
+```env
+APP_ENV=dev
+MONGODB_LOCAL_URI=mongodb://localhost:27017/myFirstDatabase
+MONGODB_URI=
+```
+
+**Producción**
+
+```env
 APP_ENV=prod
 MONGODB_URI=mongodb+srv://<usuario>:<password>@<cluster-url>/<database>?retryWrites=true&w=majority
-MONGODB_LOCAL_URI=mongodb://127.0.0.1:27017/hola
+MONGODB_LOCAL_URI=
 ```
 
 ### Qué hace cada variable
 
 - `PORT`: puerto del servidor HTTP.
-- `APP_ENV`: etiqueta que se muestra en logs al conectar a Atlas (`prod`, `staging`, `dev`, etc.).
-- `MONGODB_URI`: conexión principal (normalmente Atlas).
-- `MONGODB_LOCAL_URI`: conexión de respaldo local.
+- `APP_ENV`: define el modo de conexión (`dev` o `prod`).
+- `MONGODB_URI`: conexión de MongoDB Atlas/remota (usada en `APP_ENV=prod`).
+- `MONGODB_LOCAL_URI`: conexión local (usada en `APP_ENV=dev`).
 
 ## Ejecución
 
@@ -47,17 +65,26 @@ Modo normal:
 npm start
 ```
 
+### Scripts útiles
+
+```bash
+npm run env:dev    # copia .env.dev -> .env
+npm run env:prod   # copia .env.prod -> .env
+npm run dev:local  # activa entorno local y levanta nodemon
+npm run dev:prod   # activa entorno prod y levanta nodemon
+```
+
 Servidor disponible en:
 
 - `http://localhost:3000`
 
 ## Flujo de conexión a base de datos
 
-La API intenta conectar en este orden:
+La API conecta de forma estricta según `APP_ENV`:
 
-1. `MONGODB_URI` (Atlas u otra remota)
-2. Si falla, intenta `MONGODB_LOCAL_URI`
-3. Si ambas fallan, la API sigue levantada pero las rutas de BD pueden devolver error
+1. `APP_ENV=dev` -> intenta solo `MONGODB_LOCAL_URI`
+2. `APP_ENV=prod` -> intenta solo `MONGODB_URI`
+3. Si falla la conexión configurada, la API sigue levantada pero las rutas de BD pueden devolver error
 
 ## Endpoints
 
@@ -173,6 +200,11 @@ curl -X DELETE "http://localhost:3000/api/items/65f0c2f3a1b2c3d4e5f67890"
 ```text
 .
 ├── index.js            # entrada de la app y conexión Mongo
+├── config/
+│   ├── env.js          # lectura/normalización de variables
+│   └── database.js     # conexión a Mongo según APP_ENV
+├── constants/
+│   └── item.js         # reglas de validación de Item
 ├── routes/
 │   └── items.js        # endpoints CRUD
 ├── models/

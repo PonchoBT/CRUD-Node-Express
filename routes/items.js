@@ -6,11 +6,27 @@ const OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/;
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 100;
+const RESPONSE_MESSAGES = {
+  invalidId: 'ID inválido',
+  missingData: 'Datos incompletos',
+  nameRequired: 'El nombre es requerido',
+  descriptionRequired: 'La descripción es requerida',
+  duplicatedName: 'Ya existe un item con este nombre',
+  notFound: 'Item no encontrado',
+  created: 'Item creado exitosamente',
+  updated: 'Item actualizado exitosamente',
+  deleted: 'Item eliminado exitosamente',
+  getItemsError: 'Error al obtener los items',
+  createItemError: 'Error al crear el item',
+  getItemError: 'Error al obtener el item',
+  updateItemError: 'Error al actualizar el item',
+  deleteItemError: 'Error al eliminar el item',
+};
 
 // Middleware para validar ID
 const validarId = (req, res, next) => {
   if (!OBJECT_ID_REGEX.test(req.params.id)) {
-    return res.status(400).json({ error: 'ID inválido' });
+    return res.status(400).json({ error: RESPONSE_MESSAGES.invalidId });
   }
   next();
 };
@@ -22,10 +38,10 @@ const validarItem = (req, res, next) => {
 
   if (!name || !description) {
     return res.status(400).json({
-      error: 'Datos incompletos',
+      error: RESPONSE_MESSAGES.missingData,
       detalles: {
-        name: !name ? 'El nombre es requerido' : null,
-        description: !description ? 'La descripción es requerida' : null
+        name: !name ? RESPONSE_MESSAGES.nameRequired : null,
+        description: !description ? RESPONSE_MESSAGES.descriptionRequired : null
       }
     });
   }
@@ -73,7 +89,8 @@ router.get('/', async (req, res) => {
     const items = await Item.find()
       .sort({ date: -1 })
       .skip((page - 1) * limit)
-      .limit(limit);
+      .limit(limit)
+      .lean();
 
     const total = await Item.countDocuments();
     
@@ -84,7 +101,7 @@ router.get('/', async (req, res) => {
       totalPages: Math.ceil(total / limit)
     });
   } catch (err) {
-    return handleServerError(res, 'Error al obtener los items', err);
+    return handleServerError(res, RESPONSE_MESSAGES.getItemsError, err);
   }
 });
 
@@ -95,18 +112,18 @@ router.post('/', validarItem, async (req, res) => {
   try {
     const itemExistente = await Item.findOne({ name: req.body.name });
     if (itemExistente) {
-      return res.status(400).json({ error: 'Ya existe un item con este nombre' });
+      return res.status(400).json({ error: RESPONSE_MESSAGES.duplicatedName });
     }
 
     const newItem = new Item(req.body);
     const savedItem = await newItem.save();
     
     res.status(201).json({
-      mensaje: 'Item creado exitosamente',
+      mensaje: RESPONSE_MESSAGES.created,
       item: savedItem
     });
   } catch (err) {
-    return handleServerError(res, 'Error al crear el item', err);
+    return handleServerError(res, RESPONSE_MESSAGES.createItemError, err);
   }
 });
 
@@ -115,13 +132,13 @@ router.post('/', validarItem, async (req, res) => {
 // @access  Public
 router.get('/:id', validarId, async (req, res) => {
   try {
-    const item = await Item.findById(req.params.id);
+    const item = await Item.findById(req.params.id).lean();
     if (!item) {
-      return res.status(404).json({ error: 'Item no encontrado' });
+      return res.status(404).json({ error: RESPONSE_MESSAGES.notFound });
     }
     res.json(item);
   } catch (err) {
-    return handleServerError(res, 'Error al obtener el item', err);
+    return handleServerError(res, RESPONSE_MESSAGES.getItemError, err);
   }
 });
 
@@ -137,15 +154,15 @@ router.put('/:id', [validarId, validarItem], async (req, res) => {
     );
     
     if (!item) {
-      return res.status(404).json({ error: 'Item no encontrado' });
+      return res.status(404).json({ error: RESPONSE_MESSAGES.notFound });
     }
     
     res.json({
-      mensaje: 'Item actualizado exitosamente',
+      mensaje: RESPONSE_MESSAGES.updated,
       item
     });
   } catch (err) {
-    return handleServerError(res, 'Error al actualizar el item', err);
+    return handleServerError(res, RESPONSE_MESSAGES.updateItemError, err);
   }
 });
 
@@ -156,15 +173,15 @@ router.delete('/:id', validarId, async (req, res) => {
   try {
     const item = await Item.findByIdAndDelete(req.params.id);
     if (!item) {
-      return res.status(404).json({ error: 'Item no encontrado' });
+      return res.status(404).json({ error: RESPONSE_MESSAGES.notFound });
     }
     
     res.json({
-      mensaje: 'Item eliminado exitosamente',
+      mensaje: RESPONSE_MESSAGES.deleted,
       item
     });
   } catch (err) {
-    return handleServerError(res, 'Error al eliminar el item', err);
+    return handleServerError(res, RESPONSE_MESSAGES.deleteItemError, err);
   }
 });
 
